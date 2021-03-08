@@ -11,17 +11,19 @@
 ## 二、测试截图
 
 1. 终端指令：
-    
+    ```
     make run
-
+    ```
+    
 ![make run 运行截图](images/lab1_01.png)
 
 默认`LOG=INFO`，因此只输出优先等级高于或等于 info 的信息。
 
 
 2. 终端指令：
-    
+    ```
     make run LOG=TRACE
+    ```
 
 ![make run LOG=TRACE 运行截图](images/lab1_02.png)
 
