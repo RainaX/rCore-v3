@@ -25,6 +25,10 @@ OBJCOPY := rust-objcopy --binary-architecture=riscv64
 DISASM ?= -x
 
 
+#LOG
+LOG ?= INFO
+
+
 build: env $(KERNEL_BIN)
 
 env:
@@ -39,7 +43,7 @@ $(KERNEL_BIN): kernel
 kernel:
 	@echo Platform: $(BOARD)
 	@cp src/linker-$(BOARD).ld src/linker.ld
-	@cargo build --release
+	@LOG=$(LOG) cargo build --release
 	@rm src/linker.ld
 
 clean:

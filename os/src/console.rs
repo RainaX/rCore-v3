@@ -19,6 +19,11 @@ pub fn print(args: fmt::Arguments) {
 }
 
 
+pub fn print_in_color(args: fmt::Arguments, color_code: u8) {
+    print(format_args!("\x1b[{}m{}\x1b[0m", color_code, args));
+}
+
+
 #[macro_export]
 macro_rules! print {
     ($fmt: literal $(, $($arg: tt)+)?) => {
@@ -33,3 +38,5 @@ macro_rules! println {
         $crate::console::print(format_args!(concat!($fmt, "\n") $(, $($arg)+)?));
     }
 }
+
+
