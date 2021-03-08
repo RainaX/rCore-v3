@@ -11,6 +11,7 @@
 ## 二、测试截图
 
 1. 终端指令：
+    
     make run
 
 ![make run 运行截图](images/lab1_01.png)
@@ -19,6 +20,7 @@
 
 
 2. 终端指令：
+    
     make run LOG=TRACE
 
 ![make run LOG=TRACE 运行截图](images/lab1_02.png)
@@ -28,6 +30,6 @@
 
 ## 三、问答题目
 
-1. 寄存器`mideleg`记录了机器中断委托信息，寄存器`medeleg`记录了机器同步异常委托信息。rustsbi 委托的机器中断为`sext`, `stimer` 及 `ssoft`，委托的同步异常为`instruction_misaligned`, `breakpoint`, `user_env_call`, `instruction_page_fault`, `load_page_fault`, `store_page_fault`, `instruction_fault`, `load_fault` 及 'store_fault`。
+1. 寄存器`mideleg`记录了机器中断委托信息，寄存器`medeleg`记录了机器同步异常委托信息。rustsbi 委托的机器中断为`sext`, `stimer` 及 `ssoft`，委托的同步异常为`instruction_misaligned`, `breakpoint`, `user_env_call`, `instruction_page_fault`, `load_page_fault`, `store_page_fault`, `instruction_fault`, `load_fault` 及 `store_fault`。
 
 2. qemu 启动入口位于地址`0x00001000`，运行几条指令后跳转至地址`0x80000000`，即 rustsbi 起始代码`start`的入口，之后跳转至 rustsbi 的`main`函数；进行一系列初始化操作后将`mepc`寄存器的值设为`s_mode_start`，将`mstatus`寄存器的值设为`Supervisor`模式，并调用`enter_privileged`函数，利用`mret`指令跳转至`s_mode_start`，且此时权限为S模式；最后在`s_mode_start`函数中跳转至地址`0x80200000`。
