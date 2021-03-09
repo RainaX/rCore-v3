@@ -2,7 +2,7 @@ use core::cell::RefCell;
 use lazy_static::*;
 use crate::trap::TrapContext;
 
-const USER_STACK_SIZE: usize = 4096 * 2;
+const USER_STACK_SIZE: usize = 4096;
 const KERNEL_STACK_SIZE: usize = 4096 * 2;
 const MAX_APP_NUM: usize = 16;
 const APP_BASE_ADDRESS: usize = 0x80400000;
@@ -92,6 +92,22 @@ impl AppManagerInner {
     pub fn move_to_next_app(&mut self) {
         self.current_app += 1;
     }
+
+    pub fn valid_app_buf(&self, buf: usize, len: usize) -> bool {
+        let stack_top = USER_STACK.get_sp();
+        let stack_bottom = stack_top - USER_STACK_SIZE;
+
+        if buf >= stack_bottom && buf < stack_top && stack_top - buf >= len {
+            return true;
+        }
+
+        let app_high = APP_BASE_ADDRESS + APP_SIZE_LIMIT;
+        if buf >= APP_BASE_ADDRESS && buf < app_high && app_high - buf >= len {
+            return true;
+        }
+
+        false
+    }
 }
 
 
@@ -140,4 +156,9 @@ pub fn run_next_app() -> ! {
         ) as *const _ as usize);
     }
     panic!("Unreachable in batch::run_current_app!");
+}
+
+
+pub fn valid_app_buf(buf: usize, len: usize) -> bool {
+    APP_MANAGER.inner.borrow().valid_app_buf(buf, len)
 }
