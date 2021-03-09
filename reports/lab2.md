@@ -20,27 +20,30 @@
 
 2.
 
-	1. 
-	`__restore`作为一个函数可以接收一个参数，即位于内核栈顶一个`TrapContext`结构体的起始地址，这个`TrapContext`中包含了程序进入用户态后各寄存器的值。刚进入`__restore`时`a0`寄存器存有此地址。
-	`__restore`可以用于用户态程序由于各种原因进入内核态后，从内核态返回进入内核态前的位置继续进行执行；也可用于一个 app 刚开始执行时初次从内核态进入用户态。
+1. 
+`__restore`作为一个函数可以接收一个参数，即位于内核栈顶一个`TrapContext`结构体的起始地址，这个`TrapContext`中包含了程序进入用户态后各寄存器的值。刚进入`__restore`时`a0`寄存器存有此地址。
+`__restore`可以用于用户态程序由于各种原因进入内核态后，从内核态返回进入内核态前的位置继续进行执行；也可用于一个 app 刚开始执行时初次从内核态进入用户态。
 
-	2. 特殊处理了`sstatus`, `sepc`和`sscratch`的值。其中`sstatus`记录了`srer`后程序应位于的权限级别，`sepc`记录了`sret`后程序应开始执行的指令地址，`sscratch`里保存了`sret`后`sp`寄存器的值，在执行`sret`指令前需要与当时的`sp`值进行交换，从而使`sp`获得正确的值，并在下次进入内核态时通过读取`sscratch`中的值获得内核栈顶的正确地址。
+2. 特殊处理了`sstatus`, `sepc`和`sscratch`的值。其中`sstatus`记录了`srer`后程序应位于的权限级别，`sepc`记录了`sret`后程序应开始执行的指令地址，`sscratch`里保存了`sret`后`sp`寄存器的值，在执行`sret`指令前需要与当时的`sp`值进行交换，从而使`sp`获得正确的值，并在下次进入内核态时通过读取`sscratch`中的值获得内核栈顶的正确地址。
 
-	3. `x2`寄存器作为 stack pointer 使用，因为执行`sret`前还会进行一些栈操作，可能修改`x2`的值，因此之前已将它暂存在`sscratch`寄存器中，等到`sret`执行前再与其进行交换；`x4`寄存器作为 thread pointer 使用，目前不需要使用它的功能，因此不作处理。
+3. `x2`寄存器作为 stack pointer 使用，因为执行`sret`前还会进行一些栈操作，可能修改`x2`的值，因此之前已将它暂存在`sscratch`寄存器中，等到`sret`执行前再与其进行交换；`x4`寄存器作为 thread pointer 使用，目前不需要使用它的功能，因此不作处理。
 
-	4. 此时`sp`中包含了`sret`后程序的栈指针地址，`sscratch`中包含了内核栈顶地址，下次进入内核态时即可通过读取`sscratch`中的值找到内核栈顶。
+4. 此时`sp`中包含了`sret`后程序的栈指针地址，`sscratch`中包含了内核栈顶地址，下次进入内核态时即可通过读取`sscratch`中的值找到内核栈顶。
 
-	5. L64 `sret`指令进行状态切换，状态切换时通过预设的`sstatus`寄存器的值确定切换到哪一特权级别。因为在初始化 app 时我们将`TrapContext`中`sstatus`保存的特权级别手动设为用户态，或在用户态应用程序主动进入内核态时保存了进入前的特权级别，因此目前每次`sret`后都会进入用户态。
+5. L64 `sret`指令进行状态切换，状态切换时通过预设的`sstatus`寄存器的值确定切换到哪一特权级别。因为在初始化 app 时我们将`TrapContext`中`sstatus`保存的特权级别手动设为用户态，或在用户态应用程序主动进入内核态时保存了进入前的特权级别，因此目前每次`sret`后都会进入用户态。
 
-	6. 进入内核态时，读取`sscratch`中的值获得内核栈顶地址，同时将进入前的栈指针保存在`sscratch`中。
+6. 进入内核态时，读取`sscratch`中的值获得内核栈顶地址，同时将进入前的栈指针保存在`sscratch`中。
 
-	7. 用户态应用程序中的`ecall`指令使得程序从U态进入S态。
+7. 用户态应用程序中的`ecall`指令使得程序从U态进入S态。
 
 
 3.
 riscv64支持的中断包括：Supervisor software interrupt, Machine Software interrupt, Supervisor timer interrupt, Machine timer interrupt, Supervisor external interrupt, Machine external interrupt 。
+
 riscv64支持的异常包括：Instruction address misaligned, Instruction access fault, Illegal instruction, Breakpoint, Load address misaligned, Load access fault, Store address misaligned, Store access fault, Environment call from U-mode, Environment call from S-mode, Environment call from M-mode, Instruction page fault, Load page fault, Store page fault 。
+
 通过读取`scause`寄存器的最高位确定进入内核的是中断还是异常。若最高位为1则为中断，最高位为0则为异常。
+
 在陷入内核时，发生陷入时指令寄存器`pc`的值被存入`sepc`，同时`pc`的值被设为`stvec`寄存器中保存的处理函数地址；`scause`寄存器根据陷入类型进行设置，`stval`寄存器被设置成出错地址或其他特定的异常信息；将`sstatus`寄存器的`SIE`位置零从而屏蔽中断，置零前`SIE`的值被保存在`SPIE`中；陷入发生时的权限模式被保存在`sstatus`的`SPP`域中。通常情况下`sstatus`寄存器保存内核栈顶地址，可与`sp`寄存器交换用以保存陷入时用户栈指针。
 
 
