@@ -3,15 +3,18 @@
 #![feature(global_asm)]
 #![feature(llvm_asm)]
 #![feature(panic_info_message)]
+#![feature(const_in_array_repeat_expressions)]
 
 
 #[macro_use]
 mod console;
-mod batch;
+mod config;
 mod lang_items;
+mod loader;
 mod logger;
 mod sbi;
 mod syscall;
+mod task;
 mod trap;
 
 
@@ -35,8 +38,9 @@ pub fn rust_main() -> ! {
 
     logger::init();
     trap::init();
-    batch::init();
-    batch::run_next_app();
+    loader::load_apps();
+    task::run_first_task();
+    panic!("Unreachable in rust_main!");
 }
 
 

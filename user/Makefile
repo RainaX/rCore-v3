@@ -10,11 +10,8 @@ OBJDUMP := rust-objdump --arch-name=riscv64
 OBJCOPY := rust-objcopy --binary-architecture=riscv64
 
 
-elf:
-	@cargo build --release
-	@echo $(APPS)
-	@echo $(ELFS)
-	@echo $(BINS)
+elf: $(APPS)
+	@python3 build.py
 
 
 binary: elf
@@ -22,3 +19,10 @@ binary: elf
 
 
 build: binary
+
+
+clean:
+	@cargo clean
+
+
+.PHONY: elf binary build clean
