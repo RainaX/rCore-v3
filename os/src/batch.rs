@@ -58,17 +58,17 @@ unsafe impl Sync for AppManager {}
 
 impl AppManagerInner {
     pub fn print_app_info(&self) {
-        println!("[kernel] num_app = {}", self.num_app);
-        for i in 0..self.num_app {
-            println!("[kernel] app_{} [{:#x}, {:#x})", i, self.app_start[i], self.app_start[i + 1]);
-        }
+        //println!("[kernel] num_app = {}", self.num_app);
+        //for i in 0..self.num_app {
+            //println!("[kernel] app_{} [{:#x}, {:#x})", i, self.app_start[i], self.app_start[i + 1]);
+        //}
     }
 
     unsafe fn load_app(&self, app_id: usize) {
         if app_id >= self.num_app {
             panic!("All applications completed!");
         }
-        println!("[kernel] Loading app_{}", app_id);
+        //println!("[kernel] Loading app_{}", app_id);
 
         llvm_asm!("fence.i" :::: "volatile");
 
