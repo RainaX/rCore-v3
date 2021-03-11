@@ -1,6 +1,11 @@
+use super::stride_scheduler::SchedBlock;
+
 pub struct TaskControlBlock {
     pub task_cx_ptr: usize,
     pub task_status: TaskStatus,
+    pub sched_block: Option<SchedBlock>,
+    pub start_time: usize,
+    pub cum_time: usize,
 }
 
 

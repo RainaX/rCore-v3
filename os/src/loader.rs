@@ -94,3 +94,22 @@ pub fn init_app_cx(app_id: usize) -> &'static TaskContext {
         TaskContext::goto_restore(),
     )
 }
+
+
+pub fn valid_app_buf(app_id: usize, start: usize, len: usize) -> bool {
+    // Check if the buf range is located in app's user stack
+    let stack_high = USER_STACK[app_id].get_sp();
+    let stack_low = stack_high - USER_STACK_SIZE;
+    if start >= stack_low && start < stack_high && stack_high - start >= len {
+        return true;
+    }
+
+    // Check if the buf range is located with app's binary space
+    let bin_low = get_base_i(app_id);
+    let bin_high = bin_low + APP_SIZE_LIMIT;
+    if start >= bin_low && start < bin_high && bin_high - start >= len {
+        return true;
+    }
+    
+    false
+}
