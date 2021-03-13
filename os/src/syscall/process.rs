@@ -1,10 +1,13 @@
 use crate::task::{
     suspend_current_and_run_next,
     exit_current_and_run_next,
+    current_user_token,
     set_current_priority,
     MIN_PRIORITY,
 };
-use crate::timer::get_time_ms;
+use crate::mm::{MapPermission, is_mapped};
+use crate::timer::{TimeVal, get_time_val};
+use crate::config::PAGE_SIZE;
 
 pub fn sys_exit(exit_code: i32) -> ! {
     println!("[kernel] Application exited with code {}", exit_code);
@@ -26,6 +29,19 @@ pub fn sys_set_priority(priority: isize) -> isize {
     }
 }
 
-pub fn sys_get_time() -> isize {
-    get_time_ms() as isize
+
+pub fn sys_get_time(buf: usize, _tz: usize) -> isize {
+    let mut start = buf;
+    let end = buf + core::mem::size_of::<TimeVal>();
+    while start < end {
+        if !is_mapped(current_user_token(), start, MapPermission::U | MapPermission::W) {
+            return -1;
+        }
+        start += PAGE_SIZE;
+    }
+    let time = get_time_val();
+    unsafe {
+        (buf as *mut TimeVal).write_volatile(time);
+    }
+    0
 }

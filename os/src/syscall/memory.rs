@@ -16,7 +16,7 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
     let token = current_user_token();
 
     while cur < end {
-        if is_mapped(token, cur) {
+        if is_mapped(token, cur, MapPermission::empty()) {
             return -1;
         }
         cur += PAGE_SIZE;
