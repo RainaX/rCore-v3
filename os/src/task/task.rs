@@ -2,6 +2,7 @@ use crate::mm::{MemorySet, MapPermission, PhysPageNum, KERNEL_SPACE, VirtAddr};
 use crate::trap::{TrapContext, trap_handler};
 use crate::config::{TRAP_CONTEXT, kernel_stack_position};
 use super::TaskContext;
+use super::stride_scheduler::SchedBlock;
 
 pub struct TaskControlBlock {
     pub task_cx_ptr: usize,
@@ -9,6 +10,7 @@ pub struct TaskControlBlock {
     pub memory_set: MemorySet,
     pub trap_cx_ppn: PhysPageNum,
     pub base_size: usize,
+    pub sched_block: Option<SchedBlock>,
 }
 
 
@@ -56,6 +58,7 @@ impl TaskControlBlock {
             memory_set,
             trap_cx_ppn,
             base_size: user_sp,
+            sched_block: None,
         };
 
         let trap_cx = task_control_block.get_trap_cx();

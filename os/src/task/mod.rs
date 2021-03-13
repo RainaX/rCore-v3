@@ -1,4 +1,6 @@
+mod binary_heap;
 mod context;
+mod stride_scheduler;
 mod switch;
 mod task;
 
@@ -10,17 +12,20 @@ use switch::__switch;
 use task::{TaskControlBlock, TaskStatus};
 use alloc::vec::Vec;
 use crate::mm::{VirtAddr, MapPermission};
+use stride_scheduler::StrideScheduler;
 
 pub use context::TaskContext;
+pub use stride_scheduler::MIN_PRIORITY;
 
 pub struct TaskManager {
-    num_app: usize,
+    //num_app: usize,
     inner: RefCell<TaskManagerInner>,
 }
 
 struct TaskManagerInner {
     tasks: Vec<TaskControlBlock>,
     current_task: usize,
+    scheduler: StrideScheduler,
 }
 
 unsafe impl Sync for TaskManager {}
@@ -32,18 +37,21 @@ lazy_static! {
         let num_app = get_num_app();
         println!("num_app = {}", num_app);
         let mut tasks: Vec<TaskControlBlock> = Vec::new();
+        let mut scheduler = StrideScheduler::new();
         for i in 0..num_app {
             tasks.push(TaskControlBlock::new(
                 get_app_data(i),
                 i,
             ).unwrap());
+            scheduler.init_sched_block(i);
         }
         
         TaskManager {
-            num_app,
+            //num_app,
             inner: RefCell::new(TaskManagerInner {
                 tasks,
                 current_task: 0,
+                scheduler,
             }),
         }
     };
@@ -52,8 +60,13 @@ lazy_static! {
 
 impl TaskManager {
     fn run_first_task(&self) {
-        self.inner.borrow_mut().tasks[0].task_status = TaskStatus::Running;
-        let next_task_cx_ptr2 = self.inner.borrow().tasks[0].get_task_cx_ptr2();
+        let mut inner = self.inner.borrow_mut();
+        let first_block = inner.scheduler.get_next_sched_block().unwrap();
+        inner.current_task = first_block.id;
+        inner.tasks[first_block.id].task_status = TaskStatus::Running;
+        inner.tasks[first_block.id].sched_block = Some(first_block);
+        let next_task_cx_ptr2 = inner.tasks[first_block.id].get_task_cx_ptr2();
+        core::mem::drop(inner);
         let _unused: usize = 0;
         unsafe {
             __switch(
@@ -67,22 +80,26 @@ impl TaskManager {
         let mut inner = self.inner.borrow_mut();
         let current = inner.current_task;
         inner.tasks[current].task_status = TaskStatus::Ready;
+        let block = inner.tasks[current].sched_block.take().unwrap();
+        inner.scheduler.add_sched_block(block);
     }
 
     fn mark_current_exited(&self) {
         let mut inner = self.inner.borrow_mut();
         let current = inner.current_task;
         inner.tasks[current].task_status = TaskStatus::Exited;
+        inner.tasks[current].sched_block = None;
     }
 
     fn find_next_task(&self) -> Option<usize> {
-        let inner = self.inner.borrow();
-        let current = inner.current_task;
-        (current + 1..current + self.num_app + 1)
-            .map(|id| id % self.num_app)
-            .find(|id| {
-                inner.tasks[*id].task_status == TaskStatus::Ready
-            })
+        let mut inner = self.inner.borrow_mut();
+        match inner.scheduler.get_next_sched_block() {
+            Some(block) => {
+                inner.tasks[block.id].sched_block = Some(block);
+                Some(block.id)
+            },
+            None => None,
+        }
     }
 
     fn get_current_token(&self) -> usize {
