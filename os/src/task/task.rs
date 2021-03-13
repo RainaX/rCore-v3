@@ -25,8 +25,8 @@ impl TaskControlBlock {
         self.memory_set.token()
     }
 
-    pub fn new(elf_data: &[u8], app_id: usize) -> Self {
-        let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data);
+    pub fn new(elf_data: &[u8], app_id: usize) -> Option<Self> {
+        let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data)?;
         let trap_cx_ppn = memory_set
             .translate(VirtAddr::from(TRAP_CONTEXT).into())
             .unwrap()
@@ -34,13 +34,16 @@ impl TaskControlBlock {
         let task_status = TaskStatus::Ready;
 
         let (kernel_stack_bottom, kernel_stack_top) = kernel_stack_position(app_id);
-        KERNEL_SPACE
+        match KERNEL_SPACE
             .lock()
             .insert_framed_area(
                 kernel_stack_bottom.into(),
                 kernel_stack_top.into(),
                 MapPermission::R | MapPermission::W,
-            );
+            ) {
+            Ok(_) => (),
+            Err(_) => return None,
+        };
         let task_cx_ptr = (kernel_stack_top - core::mem::size_of::<TaskContext>()) as *mut TaskContext;
         unsafe { *task_cx_ptr = TaskContext::goto_trap_return(); }
         let task_control_block = Self {
@@ -59,7 +62,7 @@ impl TaskControlBlock {
             kernel_stack_top,
             trap_handler as usize,
         );
-        task_control_block
+        Some(task_control_block)
     }
 }
 

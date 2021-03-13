@@ -67,12 +67,12 @@ pub struct PageTable {
 }
 
 impl PageTable {
-    pub fn new() -> Self {
-        let frame = frame_alloc().unwrap();
-        PageTable {
+    pub fn new() -> Option<Self> {
+        let frame = frame_alloc()?;
+        Some(PageTable {
             root_ppn: frame.ppn,
             frames: vec![frame],
-        }
+        })
     }
 
     pub fn from_token(satp: usize) -> Self {
@@ -93,7 +93,7 @@ impl PageTable {
                 break;
             }
             if !pte.is_valid() {
-                let frame = frame_alloc().unwrap();
+                let frame = frame_alloc()?;
                 *pte = PageTableEntry::new(frame.ppn, PTEFlags::V);
                 self.frames.push(frame);
             }
@@ -121,10 +121,14 @@ impl PageTable {
     }
 
     #[allow(unused)]
-    pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) {
-        let pte = self.find_pte_create(vpn).unwrap();
+    pub fn map(&mut self, vpn: VirtPageNum, ppn: PhysPageNum, flags: PTEFlags) -> Result<(), ()> {
+        let pte = match self.find_pte_create(vpn) {
+            Some(pte) => pte,
+            None => return Err(()),
+        };
         assert!(!pte.is_valid(), "vpn {:?} is mapped before mapping", vpn);
         *pte = PageTableEntry::new(ppn, flags | PTEFlags::V);
+        Ok(())
     }
 
     #[allow(unused)]

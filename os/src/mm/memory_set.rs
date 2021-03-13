@@ -31,7 +31,7 @@ extern "C" {
 
 lazy_static! {
     pub static ref KERNEL_SPACE: Arc<Mutex<MemorySet>> = Arc::new(Mutex::new(
-        MemorySet::new_kernel()
+        MemorySet::new_kernel().unwrap()
     ));
 }
 
@@ -41,45 +41,49 @@ pub struct MemorySet {
 }
 
 impl MemorySet {
-    pub fn new_bare() -> Self {
-        Self {
-            page_table: PageTable::new(),
+    pub fn new_bare() -> Option<Self> {
+        Some(Self {
+            page_table: PageTable::new()?,
             areas: Vec::new(),
-        }
+        })
     }
 
     pub fn token(&self) -> usize {
         self.page_table.token()
     }
 
-    pub fn insert_framed_area(&mut self, start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) {
+    pub fn insert_framed_area(&mut self, start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) -> Result<(), ()> {
         self.push(MapArea::new(
             start_va,
             end_va,
             MapType::Framed,
             permission,
-        ), None);
+        ), None)
     }
 
-    fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
-        map_area.map(&mut self.page_table);
+    fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) -> Result<(), ()> {
+        map_area.map(&mut self.page_table)?;
         if let Some(data) = data {
             map_area.copy_data(&mut self.page_table, data);
         }
         self.areas.push(map_area);
+        Ok(())
     }
 
-    fn map_trampoline(&mut self) {
+    fn map_trampoline(&mut self) -> Result<(), ()> {
         self.page_table.map(
             VirtAddr::from(TRAMPOLINE).into(),
             PhysAddr::from(strampoline as usize).into(),
             PTEFlags::R | PTEFlags::X,
-        );
+        )
     }
 
-    pub fn new_kernel() -> Self {
-        let mut memory_set = Self::new_bare();
-        memory_set.map_trampoline();
+    pub fn new_kernel() -> Option<Self> {
+        let mut memory_set = Self::new_bare()?;
+        match memory_set.map_trampoline() {
+            Ok(_) => (),
+            Err(_) => return None,
+        };
 
         println!(".text [{:#x}, {:#x})", stext as usize, etext as usize);
         println!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
@@ -87,51 +91,69 @@ impl MemorySet {
         println!(".bss [{:#x}, {:#x})", sbss_with_stack as usize, ebss as usize);
 
         println!("mapping .text section");
-        memory_set.push(MapArea::new(
+        match memory_set.push(MapArea::new(
             (stext as usize).into(),
             (etext as usize).into(),
             MapType::Identical,
             MapPermission::R | MapPermission::X,
-        ), None);
+        ), None) {
+            Ok(_) => (),
+            Err(_) => return None,
+        };
 
         println!("mapping .rodata section");
-        memory_set.push(MapArea::new(
+        match memory_set.push(MapArea::new(
             (srodata as usize).into(),
             (erodata as usize).into(),
             MapType::Identical,
             MapPermission::R,
-        ), None);
+        ), None) {
+            Ok(_) => (),
+            Err(_) => return None,
+        };
 
         println!("mapping .data section");
-        memory_set.push(MapArea::new(
+        match memory_set.push(MapArea::new(
             (sdata as usize).into(),
             (edata as usize).into(),
             MapType::Identical,
             MapPermission::R | MapPermission::W,
-        ), None);
+        ), None) {
+            Ok(_) => (),
+            Err(_) => return None,
+        };
 
         println!("mapping .bss section");
-        memory_set.push(MapArea::new(
+        match memory_set.push(MapArea::new(
             (sbss_with_stack as usize).into(),
             (ebss as usize).into(),
             MapType::Identical,
             MapPermission::R | MapPermission::W,
-        ), None);
+        ), None) {
+            Ok(_) => (),
+            Err(_) => return None,
+        };
 
         println!("mapping physical memory");
-        memory_set.push(MapArea::new(
+        match memory_set.push(MapArea::new(
             (ekernel as usize).into(),
             MEMORY_END.into(),
             MapType::Identical,
             MapPermission::R | MapPermission::W,
-        ), None);
-        memory_set
+        ), None) {
+            Ok(_) => (),
+            Err(_) => return None,
+        };
+        Some(memory_set)
     }
 
-    pub fn from_elf(elf_data: &[u8]) -> (Self, usize, usize) {
-        let mut memory_set = Self::new_bare();
+    pub fn from_elf(elf_data: &[u8]) -> Option<(Self, usize, usize)> {
+        let mut memory_set = Self::new_bare()?;
 
-        memory_set.map_trampoline();
+        match memory_set.map_trampoline() {
+            Ok(_) => (),
+            Err(_) => return None,
+        };
 
         let elf = xmas_elf::ElfFile::new(elf_data).unwrap();
         let elf_header = elf.header;
@@ -156,10 +178,13 @@ impl MemorySet {
                     map_perm,
                 );
                 max_end_vpn = map_area.vpn_range.get_end();
-                memory_set.push(
+                match memory_set.push(
                     map_area,
                     Some(&elf.input[ph.offset() as usize..(ph.offset() + ph.file_size()) as usize])
-                );
+                ) {
+                    Ok(_) => (),
+                    Err(_) => return None,
+                };
             }
         }
 
@@ -168,20 +193,26 @@ impl MemorySet {
         // guard page
         user_stack_bottom += PAGE_SIZE;
         let user_stack_top = user_stack_bottom + USER_STACK_SIZE;
-        memory_set.push(MapArea::new(
+        match memory_set.push(MapArea::new(
             user_stack_bottom.into(),
             user_stack_top.into(),
             MapType::Framed,
             MapPermission::R | MapPermission::W | MapPermission::U,
-        ), None);
+        ), None) {
+            Ok(_) => (),
+            Err(_) => return None,
+        };
 
-        memory_set.push(MapArea::new(
+        match memory_set.push(MapArea::new(
             TRAP_CONTEXT.into(),
             TRAMPOLINE.into(),
             MapType::Framed,
             MapPermission::R | MapPermission::W,
-        ), None);
-        (memory_set, user_stack_top, elf.header.pt2.entry_point() as usize)
+        ), None) {
+            Ok(_) => (),
+            Err(_) => return None,
+        };
+        Some((memory_set, user_stack_top, elf.header.pt2.entry_point() as usize))
     }
 
     pub fn activate(&self) {
@@ -222,20 +253,23 @@ impl MapArea {
         }
     }
 
-    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) {
+    pub fn map_one(&mut self, page_table: &mut PageTable, vpn: VirtPageNum) -> Result<(), ()> {
         let ppn: PhysPageNum;
         match self.map_type {
             MapType::Identical => {
                 ppn = PhysPageNum(vpn.0);
             }
             MapType::Framed => {
-                let frame = frame_alloc().unwrap();
+                let frame = match frame_alloc() {
+                    Some(frame) => frame,
+                    None => return Err(()),
+                };
                 ppn = frame.ppn;
                 self.data_frames.insert(vpn, frame);
             }
         }
         let pte_flags = PTEFlags::from_bits(self.map_perm.bits).unwrap();
-        page_table.map(vpn, ppn, pte_flags);
+        page_table.map(vpn, ppn, pte_flags)
     }
 
     #[allow(unused)]
@@ -249,10 +283,11 @@ impl MapArea {
         page_table.unmap(vpn);
     }
 
-    pub fn map(&mut self, page_table: &mut PageTable) {
+    pub fn map(&mut self, page_table: &mut PageTable) -> Result<(), ()> {
         for vpn in self.vpn_range {
-            self.map_one(page_table, vpn);
+            self.map_one(page_table, vpn)?;
         }
+        Ok(())
     }
 
     #[allow(unused)]

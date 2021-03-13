@@ -35,7 +35,7 @@ lazy_static! {
             tasks.push(TaskControlBlock::new(
                 get_app_data(i),
                 i,
-            ));
+            ).unwrap());
         }
         
         TaskManager {
