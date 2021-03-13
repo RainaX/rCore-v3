@@ -2,13 +2,19 @@ use crate::mm::{VirtAddr, MapPermission, is_mapped};
 use crate::task::{current_user_token, mmap_current};
 use crate::config::PAGE_SIZE;
 
+const MAX_LEN: usize = 1 << 30;
+
 pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
-    if start % PAGE_SIZE != 0 {
+    if start % PAGE_SIZE != 0 || len > MAX_LEN {
         return -1;
     }
 
     if (prot & !0x7) != 0 || (prot & 0x7) == 0 {
         return -1;
+    }
+
+    if len == 0 {
+        return 0;
     }
     
     let mut cur = start;

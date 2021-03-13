@@ -31,7 +31,7 @@ pub fn sys_set_priority(priority: isize) -> isize {
 
 
 pub fn sys_get_time(buf: usize, _tz: usize) -> isize {
-    let mut start = buf;
+    let mut start = buf / PAGE_SIZE * PAGE_SIZE;
     let end = buf + core::mem::size_of::<TimeVal>();
     while start < end {
         if !is_mapped(current_user_token(), start, MapPermission::U | MapPermission::W) {

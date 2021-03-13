@@ -7,7 +7,7 @@ const FD_STDOUT: usize = 1;
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     match fd {
         FD_STDOUT => {
-            let mut start = buf as usize;
+            let mut start = buf as usize / PAGE_SIZE * PAGE_SIZE;
             let end = start + len;
             while start < end {
                 if !is_mapped(current_user_token(), start, MapPermission::U | MapPermission::R) {
