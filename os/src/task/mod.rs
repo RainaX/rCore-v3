@@ -9,6 +9,7 @@ use lazy_static::*;
 use switch::__switch;
 use task::{TaskControlBlock, TaskStatus};
 use alloc::vec::Vec;
+use crate::mm::{VirtAddr, MapPermission};
 
 pub use context::TaskContext;
 
@@ -96,6 +97,12 @@ impl TaskManager {
         inner.tasks[current].get_trap_cx()
     }
 
+    fn mmap_current(&self, start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) -> Result<(), ()> {
+        let mut inner = self.inner.borrow_mut();
+        let current = inner.current_task;
+        inner.tasks[current].insert_framed_area(start_va, end_va, permission)
+    }
+
     fn run_next_task(&self) {
         if let Some(next) = self.find_next_task() {
             let mut inner = self.inner.borrow_mut();
@@ -150,4 +157,8 @@ pub fn current_user_token() -> usize {
 
 pub fn current_trap_cx() -> &'static mut TrapContext {
     TASK_MANAGER.get_current_trap_cx()
+}
+
+pub fn mmap_current(start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) -> Result<(), ()> {
+    TASK_MANAGER.mmap_current(start_va, end_va, permission)
 }

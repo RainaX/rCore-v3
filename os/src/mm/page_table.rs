@@ -168,3 +168,10 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     }
     v
 }
+
+pub fn is_mapped(token: usize, va: usize) -> bool {
+    let page_table = PageTable::from_token(token);
+    let vpn: VirtPageNum = VirtAddr::from(va).into();
+    page_table.translate(vpn).is_some()
+}
+
