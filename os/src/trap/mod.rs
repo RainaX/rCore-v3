@@ -71,7 +71,8 @@ pub fn trap_handler() -> ! {
             suspend_current_and_run_next();
         }
         _ => {
-            panic!("Unsupported trap {:?}, stval = {:#x}!", scause.cause(), stval);
+            //panic!("Unsupported trap {:?}, stval = {:#x}!", scause.cause(), stval);
+            exit_current_and_run_next();
         }
     }
     trap_return();
