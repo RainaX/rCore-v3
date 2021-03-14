@@ -5,7 +5,7 @@ use crate::task::{
     set_current_priority,
     MIN_PRIORITY,
 };
-use crate::mm::{MapPermission, is_mapped};
+use crate::mm::{MapPermission, translated_mut_ref, is_mapped};
 use crate::timer::{TimeVal, get_time_val};
 use crate::config::PAGE_SIZE;
 
@@ -34,14 +34,14 @@ pub fn sys_get_time(buf: usize, _tz: usize) -> isize {
     let mut start = buf / PAGE_SIZE * PAGE_SIZE;
     let end = buf + core::mem::size_of::<TimeVal>();
     while start < end {
+        
         if !is_mapped(current_user_token(), start, MapPermission::U | MapPermission::W) {
             return -1;
         }
         start += PAGE_SIZE;
     }
     let time = get_time_val();
-    unsafe {
-        (buf as *mut TimeVal).write_volatile(time);
-    }
+    let phys_buf: &mut TimeVal = translated_mut_ref(current_user_token(), buf);
+    *phys_buf = time;
     0
 }

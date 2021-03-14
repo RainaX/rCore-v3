@@ -1,5 +1,5 @@
 use crate::mm::{VirtAddr, MapPermission, is_mapped};
-use crate::task::{current_user_token, mmap_current};
+use crate::task::{current_user_token, mmap_current, munmap_current};
 use crate::config::PAGE_SIZE;
 
 const MAX_LEN: usize = 1 << 30;
@@ -23,6 +23,7 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
 
     while cur < end {
         if is_mapped(token, cur, MapPermission::empty()) {
+            println!("cur: {:#x}", cur);
             return -1;
         }
         cur += PAGE_SIZE;
@@ -45,4 +46,31 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
         Ok(_) => (cur - start) as isize,
         Err(_) => -1,
     }
+}
+
+pub fn sys_munmap(start: usize, len: usize) -> isize {
+    if start % PAGE_SIZE != 0 || len > MAX_LEN {
+        return -1;
+    }
+
+    if len == 0 {
+        return 0;
+    }
+
+    let mut cur = start;
+    let end = start + len;
+    let token = current_user_token();
+
+    while cur < end {
+        if !is_mapped(token, cur, MapPermission::U) {
+            return -1;
+        }
+        cur += PAGE_SIZE;
+    }
+
+    let start_va = VirtAddr::from(start);
+    let end_va = VirtAddr::from(end);
+    munmap_current(start_va, end_va);
+
+    (cur - start) as isize
 }

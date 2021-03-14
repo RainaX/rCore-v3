@@ -61,6 +61,20 @@ impl MemorySet {
         ), None)
     }
 
+    pub fn unmap_framed_area(&mut self, start_va: VirtAddr, end_va: VirtAddr) {
+        let mut start_vpn = start_va.floor();
+        let end_vpn = end_va.ceil();
+        while start_vpn < end_vpn {
+            for area in self.areas.iter_mut() {
+                if start_vpn >= area.vpn_range.get_start() && start_vpn < area.vpn_range.get_end() {
+                    area.unmap_one(&mut self.page_table, start_vpn);
+                    break;
+                }
+            }
+            start_vpn.step();
+        }
+    }
+
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) -> Result<(), ()> {
         map_area.map(&mut self.page_table)?;
         if let Some(data) = data {

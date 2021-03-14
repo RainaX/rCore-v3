@@ -29,6 +29,6 @@ pub fn get_time_val() -> TimeVal {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct TimeVal(usize, usize);
 

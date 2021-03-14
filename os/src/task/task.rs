@@ -31,6 +31,10 @@ impl TaskControlBlock {
         self.memory_set.insert_framed_area(start_va, end_va, permission)
     }
 
+    pub fn unmap_framed_area(&mut self, start_va: VirtAddr, end_va: VirtAddr) {
+        self.memory_set.unmap_framed_area(start_va, end_va);
+    }
+
     pub fn new(elf_data: &[u8], app_id: usize) -> Option<Self> {
         let (memory_set, user_sp, entry_point) = MemorySet::from_elf(elf_data)?;
         let trap_cx_ppn = memory_set

@@ -120,6 +120,12 @@ impl TaskManager {
         inner.tasks[current].insert_framed_area(start_va, end_va, permission)
     }
 
+    fn munmap_current(&self, start_va: VirtAddr, end_va: VirtAddr) {
+        let mut inner = self.inner.borrow_mut();
+        let current = inner.current_task;
+        inner.tasks[current].unmap_framed_area(start_va, end_va);
+    }
+
     fn set_current_priority(&self, priority: isize) {
         let mut inner = self.inner.borrow_mut();
         let current = inner.current_task;
@@ -184,6 +190,10 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 
 pub fn mmap_current(start_va: VirtAddr, end_va: VirtAddr, permission: MapPermission) -> Result<(), ()> {
     TASK_MANAGER.mmap_current(start_va, end_va, permission)
+}
+
+pub fn munmap_current(start_va: VirtAddr, end_va: VirtAddr) {
+    TASK_MANAGER.munmap_current(start_va, end_va);
 }
 
 pub fn set_current_priority(priority: isize) {

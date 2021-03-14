@@ -1,4 +1,4 @@
-use super::{frame_alloc, PhysPageNum, FrameTracker, VirtPageNum, VirtAddr, StepByOne, MapPermission};
+use super::{frame_alloc, PhysPageNum, PhysAddr, FrameTracker, VirtPageNum, VirtAddr, StepByOne, MapPermission};
 use alloc::vec::Vec;
 use alloc::vec;
 use bitflags::*;
@@ -169,6 +169,19 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
     v
 }
 
+pub fn translated_mut_ref<T>(token: usize, va: usize) -> &'static mut T {
+    let va = VirtAddr::from(va);
+    let vpn = va.floor();
+    let page_table = PageTable::from_token(token);
+    let ppn = page_table.translate(vpn).unwrap().ppn();
+    let base: usize = PhysAddr::from(ppn).into();
+    let pa = base + va.page_offset();
+    unsafe {
+        (pa as *mut T).as_mut().unwrap()
+    }
+}
+
+
 pub fn is_mapped(token: usize, va: usize, permission: MapPermission) -> bool {
     let page_table = PageTable::from_token(token);
     let vpn: VirtPageNum = VirtAddr::from(va).floor();
@@ -177,7 +190,7 @@ pub fn is_mapped(token: usize, va: usize, permission: MapPermission) -> bool {
         None => return false,
     };
 
-    let flags = PTEFlags::from_bits(permission.bits()).unwrap();
+    let flags = PTEFlags::from_bits(permission.bits()).unwrap() | PTEFlags::V;
     (pte.flags() & flags) == flags
 }
 
