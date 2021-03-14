@@ -23,7 +23,6 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
 
     while cur < end {
         if is_mapped(token, cur, MapPermission::empty()) {
-            println!("cur: {:#x}", cur);
             return -1;
         }
         cur += PAGE_SIZE;

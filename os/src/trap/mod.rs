@@ -51,7 +51,7 @@ pub fn trap_handler() -> ! {
     set_kernel_trap_entry();
     let cx = current_trap_cx();
     let scause = scause::read();
-    let stval = stval::read();
+    let _stval = stval::read();
     match scause.cause() {
         Trap::Exception(Exception::UserEnvCall) => {
             cx.sepc += 4;
@@ -59,11 +59,11 @@ pub fn trap_handler() -> ! {
         }
         Trap::Exception(Exception::StoreFault) |
         Trap::Exception(Exception::StorePageFault) => {
-            println!("[kernel] PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, core_dumped.", stval, cx.sepc);
+            //println!("[kernel] PageFault in application, bad addr = {:#x}, bad instruction = {:#x}, core_dumped.", stval, cx.sepc);
             exit_current_and_run_next();
         }
         Trap::Exception(Exception::IllegalInstruction) => {
-            println!("[kernel] IllegalInstruction in application, core dumped.");
+            //println!("[kernel] IllegalInstruction in application, core dumped.");
             exit_current_and_run_next();
         }
         Trap::Interrupt(Interrupt::SupervisorTimer) => {

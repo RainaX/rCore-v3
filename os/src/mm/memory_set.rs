@@ -99,12 +99,12 @@ impl MemorySet {
             Err(_) => return None,
         };
 
-        println!(".text [{:#x}, {:#x})", stext as usize, etext as usize);
-        println!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
-        println!(".data [{:#x}, {:#x})", sdata as usize, edata as usize);
-        println!(".bss [{:#x}, {:#x})", sbss_with_stack as usize, ebss as usize);
+        //println!(".text [{:#x}, {:#x})", stext as usize, etext as usize);
+        //println!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
+        //println!(".data [{:#x}, {:#x})", sdata as usize, edata as usize);
+        //println!(".bss [{:#x}, {:#x})", sbss_with_stack as usize, ebss as usize);
 
-        println!("mapping .text section");
+        //println!("mapping .text section");
         match memory_set.push(MapArea::new(
             (stext as usize).into(),
             (etext as usize).into(),
@@ -115,7 +115,7 @@ impl MemorySet {
             Err(_) => return None,
         };
 
-        println!("mapping .rodata section");
+        //println!("mapping .rodata section");
         match memory_set.push(MapArea::new(
             (srodata as usize).into(),
             (erodata as usize).into(),
@@ -126,7 +126,7 @@ impl MemorySet {
             Err(_) => return None,
         };
 
-        println!("mapping .data section");
+        //println!("mapping .data section");
         match memory_set.push(MapArea::new(
             (sdata as usize).into(),
             (edata as usize).into(),
@@ -137,7 +137,7 @@ impl MemorySet {
             Err(_) => return None,
         };
 
-        println!("mapping .bss section");
+        //println!("mapping .bss section");
         match memory_set.push(MapArea::new(
             (sbss_with_stack as usize).into(),
             (ebss as usize).into(),
@@ -148,7 +148,7 @@ impl MemorySet {
             Err(_) => return None,
         };
 
-        println!("mapping physical memory");
+        //println!("mapping physical memory");
         match memory_set.push(MapArea::new(
             (ekernel as usize).into(),
             MEMORY_END.into(),
