@@ -5,8 +5,10 @@ use super::TaskContext;
 use super::{PidHandle, pid_alloc, KernelStack};
 use super::stride_scheduler::SchedBlock;
 use alloc::sync::{Weak, Arc};
+use alloc::vec;
 use alloc::vec::Vec;
 use spin::{Mutex, MutexGuard};
+use crate::fs::{File, Stdin, Stdout};
 
 pub struct TaskControlBlock {
     pub pid: PidHandle,
@@ -24,6 +26,7 @@ pub struct TaskControlBlockInner {
     pub children: Vec<Arc<TaskControlBlock>>,
     pub exit_code: i32,
     pub sched_block: Option<SchedBlock>,
+    pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
 }
 
 
@@ -59,6 +62,16 @@ impl TaskControlBlockInner {
     pub fn is_zombie(&self) -> bool {
         self.get_status() == TaskStatus::Zombie
     }
+
+    pub fn alloc_fd(&mut self) -> usize {
+        if let Some(fd) = (0..self.fd_table.len())
+            .find(|fd| self.fd_table[*fd].is_none()) {
+            fd
+        } else {
+            self.fd_table.push(None);
+            self.fd_table.len() - 1
+        }
+    }
 }
 
 impl TaskControlBlock {
@@ -90,6 +103,11 @@ impl TaskControlBlock {
                 children: Vec::new(),
                 exit_code: 0,
                 sched_block: None,
+                fd_table: vec![
+                    Some(Arc::new(Stdin)),
+                    Some(Arc::new(Stdout)),
+                    Some(Arc::new(Stdout)),
+                ],
             }),
         };
 
@@ -142,6 +160,14 @@ impl TaskControlBlock {
         let kernel_stack = KernelStack::new(&pid_handle)?;
         let kernel_stack_top = kernel_stack.get_top();
         let task_cx_ptr = kernel_stack.push_on_top(TaskContext::goto_trap_return());
+        let mut new_fd_table: Vec<Option<Arc<dyn File + Send + Sync>>> = Vec::new();
+        for fd in parent_inner.fd_table.iter() {
+            if let Some(file) = fd {
+                new_fd_table.push(Some(file.clone()));
+            } else {
+                new_fd_table.push(None);
+            }
+        }
         let task_control_block = Arc::new(TaskControlBlock {
             pid: pid_handle,
             kernel_stack,
@@ -155,6 +181,7 @@ impl TaskControlBlock {
                 children: Vec::new(),
                 exit_code: 0,
                 sched_block: None,
+                fd_table: new_fd_table,
             }),
         });
 
@@ -164,6 +191,15 @@ impl TaskControlBlock {
         trap_cx.kernel_sp = kernel_stack_top;
         Some(task_control_block)
     }
+
+    pub fn spawn(self: &Arc<TaskControlBlock>, elf_data: &[u8]) -> Option<Arc<TaskControlBlock>> {
+        let task_control_block = Arc::new(TaskControlBlock::new(elf_data)?);
+        let mut parent_inner = self.acquire_inner_lock();
+        parent_inner.children.push(task_control_block.clone());
+        task_control_block.acquire_inner_lock().parent = Some(Arc::downgrade(self));
+        Some(task_control_block)
+    }
+
 
     pub fn getpid(&self) -> usize {
         self.pid.0
