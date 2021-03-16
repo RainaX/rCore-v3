@@ -73,11 +73,19 @@ impl MemorySet {
         let mut start_vpn = start_va.floor();
         let end_vpn = end_va.ceil();
         while start_vpn < end_vpn {
-            for area in self.areas.iter_mut() {
-                if start_vpn >= area.vpn_range.get_start() && start_vpn < area.vpn_range.get_end() {
-                    area.unmap_one(&mut self.page_table, start_vpn);
-                    break;
-                }
+            let (idx, _) = self.areas
+                .iter()
+                .enumerate()
+                .find(|(_, area)| area.vpn_range.get_start() <= start_vpn && area.vpn_range.get_end() > start_vpn)
+                .unwrap();
+            let mut old_area = self.areas.remove(idx);
+            old_area.unmap_one(&mut self.page_table, start_vpn);
+            let (left, right) = old_area.split_by(start_vpn);
+            if left.data_frames.len() > 0 {
+                self.areas.push(left);
+            }
+            if right.data_frames.len() > 0 {
+                self.areas.push(right);
             }
             start_vpn.step();
         }
@@ -372,6 +380,32 @@ impl MapArea {
             }
             current_vpn.step();
         }
+    }
+
+    #[allow(unused)]
+    fn split_by(self, split_vpn: VirtPageNum) -> (Self, Self) {
+        let mut temp_vpn = split_vpn;
+        let mut left = Self {
+            vpn_range: VPNRange::new(self.vpn_range.get_start(), temp_vpn),
+            data_frames: BTreeMap::new(),
+            map_type: self.map_type,
+            map_perm: self.map_perm,
+        };
+        temp_vpn.step();
+        let mut right = Self {
+            vpn_range: VPNRange::new(temp_vpn, self.vpn_range.get_end()),
+            data_frames: BTreeMap::new(),
+            map_type: self.map_type,
+            map_perm: self.map_perm,
+        };
+        for (vpn, frame) in self.data_frames.into_iter() {
+            if vpn < split_vpn {
+                left.data_frames.insert(vpn, frame);
+            } else {
+                right.data_frames.insert(vpn, frame);
+            }
+        }
+        (left, right)
     }
 }
 

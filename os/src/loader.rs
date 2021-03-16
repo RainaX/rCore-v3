@@ -55,6 +55,7 @@ pub fn get_app_data_by_name(name: &str) -> Option<&'static [u8]> {
         .map(|i| get_app_data(i))
 }
 
+#[allow(unused)]
 pub fn list_apps() {
     println!("/**** APPS ****");
     for app in APP_NAMES.iter() {
