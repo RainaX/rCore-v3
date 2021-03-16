@@ -77,3 +77,14 @@ lazy_static! {
 pub fn add_initproc() {
     add_task(INITPROC.clone());
 }
+
+pub fn spawn(path: &str) -> Option<Arc<TaskControlBlock>> {
+    let elf_data = get_app_data_by_name(path)?;
+    let task = Arc::new(TaskControlBlock::new(elf_data)?);
+
+    let parent = current_task().unwrap();
+    parent.acquire_inner_lock().children.push(task.clone());
+    task.acquire_inner_lock().parent = Some(Arc::downgrade(&parent));
+
+    Some(task)
+}

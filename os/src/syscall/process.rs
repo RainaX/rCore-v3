@@ -5,6 +5,7 @@ use crate::task::{
     current_user_token,
     set_current_priority,
     add_task,
+    spawn,
     MIN_PRIORITY,
 };
 use crate::mm::{
@@ -131,5 +132,22 @@ pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
     } else {
         -2
     }
+}
+
+
+pub fn sys_spawn(path: *const u8) -> isize {
+    let token = current_user_token();
+    let path = match translated_str(token, path) {
+        Some(path) => path,
+        None => return -1,
+    };
+    let new_task = match spawn(path.as_str()) {
+        Some(task) => task,
+        None => return -1,
+    };
+    let new_pid = new_task.pid.0;
+
+    add_task(new_task);
+    new_pid as isize
 }
         
