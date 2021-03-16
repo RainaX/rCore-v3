@@ -44,11 +44,14 @@ pub fn rust_main() -> ! {
     mm::init();
     //println!("[kernel] back to world!");
     //mm::remap_test();
+    task::add_initproc();
+    println!("after initproc!");
     logger::init();
     trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
-    task::run_first_task();
+    loader::list_apps();
+    task::run_tasks();
     panic!("Unreachable in rust_main!");
 }
 

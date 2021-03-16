@@ -61,6 +61,14 @@ impl MemorySet {
         ), None)
     }
 
+    pub fn remove_area_with_start_vpn(&mut self, start_vpn: VirtPageNum) {
+        if let Some((idx, area)) = self.areas.iter_mut().enumerate()
+            .find(|(_, area)| area.vpn_range.get_start() == start_vpn) {
+            area.unmap(&mut self.page_table);
+            self.areas.remove(idx);
+        }
+    }
+
     pub fn unmap_framed_area(&mut self, start_va: VirtAddr, end_va: VirtAddr) {
         let mut start_vpn = start_va.floor();
         let end_vpn = end_va.ceil();
@@ -229,6 +237,27 @@ impl MemorySet {
         Some((memory_set, user_stack_top, elf.header.pt2.entry_point() as usize))
     }
 
+    pub fn from_existed_user(user_space: &MemorySet) -> Option<MemorySet> {
+        let mut memory_set = Self::new_bare()?;
+        match memory_set.map_trampoline() {
+            Ok(_) => (),
+            Err(_) => return None,
+        };
+        for area in user_space.areas.iter() {
+            let new_area = MapArea::from_another(area);
+            match memory_set.push(new_area, None) {
+                Ok(_) => (),
+                Err(_) => return None,
+            };
+            for vpn in area.vpn_range {
+                let src_ppn = user_space.translate(vpn).unwrap().ppn();
+                let dst_ppn = memory_set.translate(vpn).unwrap().ppn();
+                dst_ppn.get_bytes_array().copy_from_slice(src_ppn.get_bytes_array());
+            }
+        }
+        Some(memory_set)
+    }
+
     pub fn activate(&self) {
         let satp = self.page_table.token();
         unsafe {
@@ -239,6 +268,10 @@ impl MemorySet {
 
     pub fn translate(&self, vpn: VirtPageNum) -> Option<PageTableEntry> {
         self.page_table.translate(vpn)
+    }
+
+    pub fn recycle_data_pages(&mut self) {
+        self.areas.clear();
     }
 }
 
@@ -264,6 +297,15 @@ impl MapArea {
             data_frames: BTreeMap::new(),
             map_type,
             map_perm,
+        }
+    }
+
+    pub fn from_another(another: &MapArea) -> Self {
+        Self {
+            vpn_range: VPNRange::new(another.vpn_range.get_start(), another.vpn_range.get_end()),
+            data_frames: BTreeMap::new(),
+            map_type: another.map_type,
+            map_perm: another.map_perm,
         }
     }
 
