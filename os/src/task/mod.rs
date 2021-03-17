@@ -13,6 +13,7 @@ use task::{TaskControlBlock, TaskStatus};
 use alloc::sync::Arc;
 use manager::fetch_task;
 use lazy_static::*;
+use crate::fs::remove_mailbox;
 
 pub use context::TaskContext;
 pub use processor::{
@@ -60,6 +61,7 @@ pub fn exit_current_and_run_next(exit_code: i32) {
     inner.children.clear();
     
     inner.memory_set.recycle_data_pages();
+    remove_mailbox(task.pid.0);
     drop(inner);
 
     drop(task);
@@ -76,15 +78,4 @@ lazy_static! {
 
 pub fn add_initproc() {
     add_task(INITPROC.clone());
-}
-
-pub fn spawn(path: &str) -> Option<Arc<TaskControlBlock>> {
-    let elf_data = get_app_data_by_name(path)?;
-    let task = Arc::new(TaskControlBlock::new(elf_data)?);
-
-    let parent = current_task().unwrap();
-    parent.acquire_inner_lock().children.push(task.clone());
-    task.acquire_inner_lock().parent = Some(Arc::downgrade(&parent));
-
-    Some(task)
 }

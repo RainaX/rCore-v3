@@ -8,7 +8,7 @@ use alloc::sync::{Weak, Arc};
 use alloc::vec;
 use alloc::vec::Vec;
 use spin::{Mutex, MutexGuard};
-use crate::fs::{File, Stdin, Stdout};
+use crate::fs::{File, Stdin, Stdout, Mailbox};
 
 pub struct TaskControlBlock {
     pub pid: PidHandle,
@@ -27,6 +27,7 @@ pub struct TaskControlBlockInner {
     pub exit_code: i32,
     pub sched_block: Option<SchedBlock>,
     pub fd_table: Vec<Option<Arc<dyn File + Send + Sync>>>,
+    pub mailbox: Arc<Mailbox>,
 }
 
 
@@ -90,6 +91,7 @@ impl TaskControlBlock {
         let kernel_stack = KernelStack::new(&pid_handle)?;
         let kernel_stack_top = kernel_stack.get_top();
         let task_cx_ptr = kernel_stack.push_on_top(TaskContext::goto_trap_return());
+        let mailbox = Mailbox::new(pid_handle.0);
         let task_control_block = Self {
             pid: pid_handle,
             kernel_stack,
@@ -108,6 +110,7 @@ impl TaskControlBlock {
                     Some(Arc::new(Stdout)),
                     Some(Arc::new(Stdout)),
                 ],
+                mailbox,
             }),
         };
 
@@ -168,6 +171,7 @@ impl TaskControlBlock {
                 new_fd_table.push(None);
             }
         }
+        let mailbox = Mailbox::new(pid_handle.0);
         let task_control_block = Arc::new(TaskControlBlock {
             pid: pid_handle,
             kernel_stack,
@@ -182,6 +186,7 @@ impl TaskControlBlock {
                 exit_code: 0,
                 sched_block: None,
                 fd_table: new_fd_table,
+                mailbox,
             }),
         });
 

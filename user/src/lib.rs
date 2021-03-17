@@ -101,3 +101,7 @@ pub fn sleep(period_ms: usize) {
         yield_();
     }
 }
+
+pub fn spawn(path: &str) -> isize { sys_spawn(path) }
+pub fn mailread(buf: &[u8]) -> isize { sys_mailread(buf.as_ptr(), buf.len()) }
+pub fn mailwrite(pid: usize, buf: &[u8]) -> isize { sys_mailwrite(pid, buf.as_ptr(), buf.len()) }

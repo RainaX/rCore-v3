@@ -14,6 +14,9 @@ const SYSCALL_FORK: usize = 220;
 const SYSCALL_EXEC: usize = 221;
 const SYSCALL_MMAP: usize = 222;
 const SYSCALL_WAITPID: usize = 260;
+const SYSCALL_SPAWN: usize = 400;
+const SYSCALL_MAILREAD: usize = 401;
+const SYSCALL_MAILWRITE: usize = 402;
 
 fn syscall(id: usize, args: [usize; 3]) -> isize {
     let mut ret: isize;
@@ -94,4 +97,16 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
 
 pub fn sys_waitpid(pid: isize, exit_code: *mut i32) -> isize {
     syscall(SYSCALL_WAITPID, [pid as usize, exit_code as usize, 0])
+}
+
+pub fn sys_spawn(path: &str) -> isize {
+    syscall(SYSCALL_SPAWN, [path.as_ptr() as usize, 0, 0])
+}
+
+pub fn sys_mailread(buf: *const u8, len: usize) -> isize {
+    syscall(SYSCALL_MAILREAD, [buf as usize, len, 0])
+}
+
+pub fn sys_mailwrite(pid: usize, buf: *const u8, len: usize) -> isize {
+    syscall(SYSCALL_MAILWRITE, [pid, buf as usize, len])
 }
