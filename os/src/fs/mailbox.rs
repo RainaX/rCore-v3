@@ -29,14 +29,6 @@ impl Mailbox {
         MAILBOX_MANAGER.lock().insert(pid, mailbox.clone());
         mailbox
     }
-
-    pub fn is_full(&self) -> bool {
-        self.inner.lock().status == MailboxStatus::FULL
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.inner.lock().status == MailboxStatus::EMPTY
-    }
 }
 
 
@@ -95,22 +87,20 @@ impl MailboxInner {
 }
 
 impl File for Mailbox {
-    fn read(&self, buf: UserBuffer) -> isize {
-        let mut inner = self.inner.lock();
-        if inner.status == MailboxStatus::EMPTY {
-            -1
-        } else {
-            inner.read_mail(buf) as isize
-        }
+    fn readable(&self) -> bool { 
+        self.inner.lock().status != MailboxStatus::EMPTY
     }
 
-    fn write(&self, buf: UserBuffer) -> isize {
-        let mut inner = self.inner.lock();
-        if inner.status == MailboxStatus::FULL {
-            -1
-        } else {
-            inner.write_mail(buf) as isize
-        }
+    fn writable(&self) -> bool {
+        self.inner.lock().status != MailboxStatus::FULL   
+    }
+
+    fn read(&self, buf: UserBuffer) -> usize {
+        self.inner.lock().read_mail(buf)
+    }
+
+    fn write(&self, buf: UserBuffer) -> usize {
+        self.inner.lock().write_mail(buf)
     }
 }
 

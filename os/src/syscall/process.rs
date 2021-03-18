@@ -5,19 +5,24 @@ use crate::task::{
     current_user_token,
     set_current_priority,
     add_task,
-    spawn,
     MIN_PRIORITY,
 };
 use crate::mm::{
     MapPermission,
     translated_str,
+    translated_ref,
     translated_refmut,
     is_mapped,
 };
+use crate::fs::{
+    open_file,
+    OpenFlags,
+};
 use crate::timer::{TimeVal, get_time_val};
 use crate::config::PAGE_SIZE;
-use crate::loader::get_app_data_by_name;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
+use alloc::string::String;
 
 pub fn sys_exit(exit_code: i32) -> ! {
     //println!("[kernel] Application exited with code {}", exit_code);
@@ -78,16 +83,38 @@ pub fn sys_fork() -> isize {
 }
 
 
-pub fn sys_exec(path: *const u8) -> isize {
+pub fn sys_exec(path: *const u8, mut args: *const usize) -> isize {
     let token = current_user_token();
     let path = match translated_str(token, path) {
         Some(path) => path,
         None => return -1,
     };
-    if let Some(data) = get_app_data_by_name(path.as_str()) {
+    let mut args_vec: Vec<String> = Vec::new();
+    loop {
+        let mut start = args as usize / PAGE_SIZE * PAGE_SIZE;
+        let end = start + core::mem::size_of::<usize>();
+        while start < end {
+            if !is_mapped(token, start, MapPermission::U | MapPermission::R) {
+                return -1;
+            }
+            start += PAGE_SIZE;
+        }
+        let arg_str_ptr = *translated_ref(token, args);
+        if arg_str_ptr == 0 {
+            break;
+        }
+        args_vec.push(match translated_str(token, arg_str_ptr as *const u8) {
+            Some(arg) => arg,
+            None => return -1,
+        });
+        unsafe { args = args.add(1); }
+    }
+    if let Some(app_inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        let all_data = app_inode.read_all();
         let task = current_task().unwrap();
-        match task.exec(data) {
-            Ok(_) => 0,
+        let argc = args_vec.len();
+        match task.exec(all_data.as_slice(), args_vec) {
+            Ok(_) => argc as isize,
             Err(_) => -1,
         }
     } else {
@@ -141,13 +168,21 @@ pub fn sys_spawn(path: *const u8) -> isize {
         Some(path) => path,
         None => return -1,
     };
-    let new_task = match spawn(path.as_str()) {
-        Some(task) => task,
-        None => return -1,
-    };
-    let new_pid = new_task.pid.0;
 
-    add_task(new_task);
-    new_pid as isize
+    if let Some(inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        let all_data = inode.read_all();
+
+        let current_task = current_task().unwrap();
+        let new_task = match current_task.spawn(all_data.as_slice()) {
+            Some(task) => task,
+            None => return -1,
+        };
+        let new_pid = new_task.pid.0;
+
+        add_task(new_task);
+        new_pid as isize
+    } else {
+        -1
+    }
 }
         

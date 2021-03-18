@@ -14,6 +14,7 @@ use crate::config::{
     TRAMPOLINE,
     TRAP_CONTEXT,
     USER_STACK_SIZE,
+    MMIO,
 };
 
 extern "C" {
@@ -33,6 +34,10 @@ lazy_static! {
     pub static ref KERNEL_SPACE: Arc<Mutex<MemorySet>> = Arc::new(Mutex::new(
         MemorySet::new_kernel().unwrap()
     ));
+}
+
+pub fn kernel_token() -> usize {
+    KERNEL_SPACE.lock().token()
 }
 
 pub struct MemorySet {
@@ -174,6 +179,19 @@ impl MemorySet {
             Ok(_) => (),
             Err(_) => return None,
         };
+
+        //println!("mapping memory-mapped registers");
+        for pair in MMIO {
+            match memory_set.push(MapArea::new(
+                (*pair).0.into(),
+                ((*pair).0 + (*pair).1).into(),
+                MapType::Identical,
+                MapPermission::R | MapPermission::W,
+            ), None) {
+                Ok(_) => (),
+                Err(_) => return None,
+            };
+        }
         Some(memory_set)
     }
 

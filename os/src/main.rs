@@ -14,9 +14,9 @@ extern crate bitflags;
 #[macro_use]
 mod console;
 mod config;
+mod drivers;
 mod fs;
 mod lang_items;
-mod loader;
 mod logger;
 mod mm;
 mod sbi;
@@ -45,13 +45,13 @@ pub fn rust_main() -> ! {
     mm::init();
     //println!("[kernel] back to world!");
     //mm::remap_test();
-    task::add_initproc();
     //println!("after initproc!");
     logger::init();
     trap::init();
     trap::enable_timer_interrupt();
     timer::set_next_trigger();
-    //loader::list_apps();
+    fs::list_apps();
+    task::add_initproc();
     task::run_tasks();
     panic!("Unreachable in rust_main!");
 }

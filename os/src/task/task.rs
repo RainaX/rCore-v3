@@ -1,4 +1,11 @@
-use crate::mm::{MemorySet, PhysPageNum, KERNEL_SPACE, VirtAddr, MapPermission};
+use crate::mm::{
+    MemorySet,
+    PhysPageNum,
+    KERNEL_SPACE,
+    VirtAddr,
+    MapPermission,
+    translated_refmut,
+};
 use crate::trap::{TrapContext, trap_handler};
 use crate::config::{TRAP_CONTEXT};
 use super::TaskContext;
@@ -7,6 +14,7 @@ use super::stride_scheduler::SchedBlock;
 use alloc::sync::{Weak, Arc};
 use alloc::vec;
 use alloc::vec::Vec;
+use alloc::string::String;
 use spin::{Mutex, MutexGuard};
 use crate::fs::{File, Stdin, Stdout, Mailbox};
 
@@ -125,8 +133,8 @@ impl TaskControlBlock {
         Some(task_control_block)
     }
 
-    pub fn exec(&self, elf_data: &[u8]) -> Result<(), ()> {
-        let (memory_set, user_sp, entry_point) = match MemorySet::from_elf(elf_data) {
+    pub fn exec(&self, elf_data: &[u8], args: Vec<String>) -> Result<(), ()> {
+        let (memory_set, mut user_sp, entry_point) = match MemorySet::from_elf(elf_data) {
             Some(x) => x,
             None => return Err(()),
         };
@@ -135,17 +143,42 @@ impl TaskControlBlock {
             .unwrap()
             .ppn();
 
+        user_sp -= (args.len() + 1) * core::mem::size_of::<usize>();
+        let argv_base = user_sp;
+        let mut argv: Vec<_> = (0..=args.len())
+            .map(|arg| {
+                translated_refmut(
+                    memory_set.token(),
+                    (argv_base + arg * core::mem::size_of::<usize>()) as *mut usize,
+                )
+            })
+            .collect();
+        *argv[args.len()] = 0;
+        for i in 0..args.len() {
+            user_sp -= args[i].len() + 1;
+            *argv[i] = user_sp;
+            let mut p = user_sp;
+            for c in args[i].as_bytes() {
+                *translated_refmut(memory_set.token(), p as *mut u8) = *c;
+                p += 1;
+            }
+            *translated_refmut(memory_set.token(), p as *mut u8) = 0;
+        }
+        user_sp -= user_sp % core::mem::size_of::<usize>();
+
         let mut inner = self.acquire_inner_lock();
         inner.memory_set = memory_set;
         inner.trap_cx_ppn = trap_cx_ppn;
-        let trap_cx = inner.get_trap_cx();
-        *trap_cx = TrapContext::app_init_context(
+        let mut trap_cx = TrapContext::app_init_context(
             entry_point,
             user_sp,
             KERNEL_SPACE.lock().token(),
             self.kernel_stack.get_top(),
             trap_handler as usize,
         );
+        trap_cx.x[10] = args.len();
+        trap_cx.x[11] = argv_base;
+        *inner.get_trap_cx() = trap_cx;
 
         Ok(())
     }

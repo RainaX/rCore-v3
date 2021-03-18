@@ -121,11 +121,11 @@ pub fn make_pipe() -> (Arc<Pipe>, Arc<Pipe>) {
 
 
 impl File for Pipe {
-    fn read(&self, buf: UserBuffer) -> isize {
-        //assert_eq!(self.readable, true);
-        if !self.readable {
-            return -1;
-        }
+    fn readable(&self) -> bool { self.readable }
+    fn writable(&self) -> bool { self.writable }
+
+    fn read(&self, buf: UserBuffer) -> usize {
+        assert_eq!(self.readable, true);
         let mut buf_iter = buf.into_iter();
         let mut read_size = 0usize;
         loop {
@@ -133,7 +133,7 @@ impl File for Pipe {
             let loop_read = ring_buffer.available_read();
             if loop_read == 0 {
                 if ring_buffer.all_write_ends_closed() {
-                    return read_size as isize;
+                    return read_size;
                 }
                 drop(ring_buffer);
                 suspend_current_and_run_next();
@@ -144,17 +144,14 @@ impl File for Pipe {
                     unsafe { *byte_ref = ring_buffer.read_byte(); }
                     read_size += 1;
                 } else {
-                    return read_size as isize;
+                    return read_size;
                 }
             }
         }
     }
 
-    fn write(&self, buf: UserBuffer) -> isize {
-        //assert_eq!(self.writable, true);
-        if !self.writable {
-            return -1;
-        }
+    fn write(&self, buf: UserBuffer) -> usize {
+        assert_eq!(self.writable, true);
         let mut buf_iter = buf.into_iter();
         let mut write_size = 0usize;
         loop {
@@ -170,7 +167,7 @@ impl File for Pipe {
                     ring_buffer.write_byte(unsafe { *byte_ref });
                     write_size += 1;
                 } else {
-                    return write_size as isize;
+                    return write_size;
                 }
             }
         }
