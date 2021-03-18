@@ -1,0 +1,10 @@
+[package]
+name = "easy-fs"
+version = "0.1.0"
+authors = ["RainaX <xiaofanx@andrew.cmu.edu>"]
+edition = "2018"
+
+
+[dependencies]
+lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
+spin = "0.7.0"
