@@ -42,6 +42,38 @@ impl TimeVal {
 }
 
 
+#[repr(C)]
+pub struct Stat {
+    pub dev: u64,
+    pub ino: u64,
+    pub mode: StatMode,
+    pub nlink: u32,
+    pad: [u64; 7],
+}
+
+impl Stat {
+    pub fn new() -> Self {
+        Stat {
+            dev: 0,
+            ino: 0,
+            mode: StatMode::NULL,
+            nlink: 0,
+            pad: [0; 7],
+        }
+    }
+}
+
+bitflags! {
+    pub struct StatMode: u32 {
+        const NULL = 0;
+        const DIR = 0o040000;
+        const FILE = 0o100000;
+    }
+}
+
+const AT_FDCWD: isize = -100;
+
+
 #[no_mangle]
 #[link_section = ".text.entry"]
 pub extern "C" fn _start(argc: usize, argv: usize) -> ! {
@@ -85,11 +117,18 @@ bitflags! {
 
 
 pub fn dup(fd: usize) -> isize { sys_dup(fd) }
+pub fn unlink(path: &str) -> isize { sys_unlinkat(AT_FDCWD as usize, path, 0) }
+
+pub fn link(old_path: &str, new_path: &str) -> isize {
+    sys_linkat(AT_FDCWD as usize, old_path, AT_FDCWD as usize, new_path, 0)
+}
+
 pub fn open(path: &str, flags: OpenFlags) -> isize { sys_open(path, flags.bits) }
 pub fn close(fd: usize) -> isize { sys_close(fd) }
 pub fn pipe(pipe_fd: &mut [usize]) -> isize { sys_pipe(pipe_fd) }
 pub fn read(fd: usize, buf: &mut [u8]) -> isize { sys_read(fd, buf) }
 pub fn write(fd: usize, buf: &[u8]) -> isize { sys_write(fd, buf) }
+pub fn fstat(fd: usize, st: &mut Stat) -> isize { sys_fstat(fd, st) }
 pub fn exit(exit_code: i32) -> ! { sys_exit(exit_code) }
 pub fn yield_() -> isize { sys_yield() }
 pub fn set_priority(priority: isize) -> isize { sys_set_priority(priority) }

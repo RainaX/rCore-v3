@@ -1,11 +1,14 @@
-use super::TimeVal;
+use super::{TimeVal, Stat};
 
 const SYSCALL_DUP: usize = 24;
+const SYSCALL_UNLINKAT: usize = 35;
+const SYSCALL_LINKAT: usize = 37;
 const SYSCALL_OPEN: usize = 56;
 const SYSCALL_CLOSE: usize = 57;
 const SYSCALL_PIPE: usize = 59;
 const SYSCALL_READ: usize = 63;
 const SYSCALL_WRITE: usize = 64;
+const SYSCALL_FSTAT: usize = 80;
 const SYSCALL_EXIT: usize = 93;
 const SYSCALL_YIELD: usize = 124;
 const SYSCALL_SET_PRIORITY: usize = 140;
@@ -33,21 +36,61 @@ fn syscall(id: usize, args: [usize; 3]) -> isize {
     ret
 }
 
+fn syscall5(id: usize, args: [usize; 5]) -> isize {
+    let mut ret: isize;
+    unsafe {
+        llvm_asm!("ecall"
+            : "={x10}" (ret)
+            : "{x10}" (args[0]), "{x11}" (args[1]), "{x12}" (args[2]), "{x13}" (args[3]), "{x14}" (args[4]), "{x17}" (id)
+            : "memory"
+            : "volatile"
+        );
+    }
+    ret
+}
+
+
 pub fn sys_dup(fd: usize) -> isize {
     syscall(SYSCALL_DUP, [fd, 0, 0])
 }
+
+
+pub fn sys_unlinkat(dirfd: usize, path: &str, flags: u32) -> isize {
+    syscall(SYSCALL_UNLINKAT, [dirfd, path.as_ptr() as usize, flags as usize])
+}
+
+
+pub fn sys_linkat(
+    olddirfd: usize,
+    oldpath: &str,
+    newdirfd: usize,
+    newpath: &str,
+    flags: u32,
+    ) -> isize {
+    syscall5(SYSCALL_LINKAT, [
+        olddirfd,
+        oldpath.as_ptr() as usize,
+        newdirfd,
+        newpath.as_ptr() as usize,
+        flags as usize,
+    ])
+}
+
 
 pub fn sys_open(path: &str, flags: u32) -> isize {
     syscall(SYSCALL_OPEN, [path.as_ptr() as usize, flags as usize, 0])
 }
 
+
 pub fn sys_close(fd: usize) -> isize {
     syscall(SYSCALL_CLOSE, [fd, 0, 0])
 }
 
+
 pub fn sys_pipe(pipe: &mut [usize]) -> isize {
     syscall(SYSCALL_PIPE, [pipe.as_mut_ptr() as usize, 0, 0])
 }
+
 
 pub fn sys_read(fd: usize, buffer: &mut [u8]) -> isize {
     syscall(SYSCALL_READ, [fd, buffer.as_ptr() as usize, buffer.len()])
@@ -56,6 +99,11 @@ pub fn sys_read(fd: usize, buffer: &mut [u8]) -> isize {
 
 pub fn sys_write(fd: usize, buffer: &[u8]) -> isize {
     syscall(SYSCALL_WRITE, [fd, buffer.as_ptr() as usize, buffer.len()])
+}
+
+
+pub fn sys_fstat(fd: usize, st: &mut Stat) -> isize {
+    syscall(SYSCALL_FSTAT, [fd, st as *mut _ as usize, 0])
 }
 
 
@@ -95,8 +143,8 @@ pub fn sys_fork() -> isize {
 }
 
 
-pub fn sys_exec(path: &str) -> isize {
-    syscall(SYSCALL_EXEC, [path.as_ptr() as usize, 0, 0])
+pub fn sys_exec(path: &str, args: &[*const u8]) -> isize {
+    syscall(SYSCALL_EXEC, [path.as_ptr() as usize, args.as_ptr() as usize, 0])
 }
 
 
