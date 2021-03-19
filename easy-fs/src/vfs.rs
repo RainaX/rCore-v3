@@ -142,6 +142,63 @@ impl Inode {
         )))
     }
 
+    pub fn link(&self, old_name: &str, new_name: &str) -> Result<(), ()> {
+        let mut fs = self.fs.lock();
+        let inode_id = match self.read_disk_inode(|disk_inode| {
+            self.find_inode_id(old_name, disk_inode)
+        }) {
+            Some(id) => id,
+            None => return Err(()),
+        };
+        if self.read_disk_inode(|disk_inode| {
+            self.find_inode_id(new_name, disk_inode)
+        }).is_some() {
+            return Err(());
+        }
+        self.modify_disk_inode(|disk_inode| {
+            let file_count = (disk_inode.size as usize) / DIRENT_SZ;
+            let new_size = (file_count + 1) * DIRENT_SZ;
+            self.increase_size(new_size as u32, disk_inode, &mut fs);
+            let dirent = DirEntry::new(new_name, inode_id);
+            disk_inode.write_at(
+                file_count * DIRENT_SZ,
+                dirent.as_bytes(),
+                &self.block_device,
+            );
+        });
+        drop(fs);
+        Ok(())
+    }
+
+    pub fn unlink(&self, name: &str) -> Result<(), ()> {
+        let _ = self.fs.lock();
+        self.modify_disk_inode(|disk_inode| {
+            let file_count = (disk_inode.size as usize) / DIRENT_SZ;
+            let mut dirent = DirEntry::empty();
+            for i in 0..file_count {
+                disk_inode.read_at(
+                    DIRENT_SZ * i,
+                    dirent.as_bytes_mut(),
+                    &self.block_device,
+                );
+                if dirent.name() == name {
+                    if dirent.inode_number() == 0 {
+                        return Err(());
+                    } else {
+                        let new_dirent = DirEntry::empty();
+                        disk_inode.write_at(
+                            DIRENT_SZ * i,
+                            new_dirent.as_bytes(),
+                            &self.block_device,
+                        );
+                        return Ok(());
+                    }
+                }
+            }
+            Err(())
+        })
+    }
+
     pub fn ls(&self) -> Vec<String> {
         let _ = self.fs.lock();
         self.read_disk_inode(|disk_inode| {

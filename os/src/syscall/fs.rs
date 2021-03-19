@@ -14,8 +14,39 @@ use crate::fs::{
     make_pipe,
     OpenFlags,
     open_file,
+    link_file,
+    unlink_file,
 };
 use alloc::sync::Arc;
+
+pub fn sys_linkat(_oldfd: usize, olddir: *const u8, _newfd: usize, newdir: *const u8, _flags: u32) -> isize {
+    let token = current_user_token();
+    let olddir = match translated_str(token, olddir) {
+        Some(dir) => dir,
+        None => return -1,
+    };
+    let newdir = match translated_str(token, newdir) {
+        Some(dir) => dir,
+        None => return -1,
+    };
+
+    match link_file(olddir.as_str(), newdir.as_str()) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
+
+pub fn sys_unlinkat(_fd: usize, dir: *const u8, _flags: u32) -> isize {
+    let token = current_user_token();
+    let dir = match translated_str(token, dir) {
+        Some(dir) => dir,
+        None => return -1,
+    };
+    match unlink_file(dir.as_str()) {
+        Ok(_) => 0,
+        Err(_) => -1,
+    }
+}
 
 pub fn sys_write(fd: usize, buf: *const u8, len: usize) -> isize {
     let token = current_user_token();
