@@ -3,14 +3,31 @@
 #![feature(global_asm)]
 #![feature(llvm_asm)]
 #![feature(panic_info_message)]
+#![feature(const_in_array_repeat_expressions)]
+#![feature(alloc_error_handler)]
+
+extern crate alloc;
+
+#[macro_use]
+extern crate bitflags;
 
 #[macro_use]
 mod console;
+mod config;
+mod drivers;
+mod fs;
 mod lang_items;
+mod logger;
+mod mm;
 mod sbi;
+mod syscall;
+mod task;
+mod timer;
+mod trap;
 
 
 global_asm!(include_str!("entry.asm"));
+global_asm!(include_str!("link_app.S"));
 
 fn clear_bss() {
     extern "C" {
@@ -23,30 +40,20 @@ fn clear_bss() {
 
 #[no_mangle]
 pub fn rust_main() -> ! {
-    extern "C" {
-        fn stext();
-        fn etext();
-        fn srodata();
-        fn erodata();
-        fn sdata();
-        fn edata();
-        fn sbss();
-        fn ebss();
-        fn boot_stack();
-        fn boot_stack_top();
-    }
     clear_bss();
-
-    println!("Hello, world!");
-    println!(".text [{:#x}, {:#x})", stext as usize, etext as usize);
-    println!(".rodata [{:#x}, {:#x})", srodata as usize, erodata as usize);
-    println!(".data [{:#x}, {:#x})", sdata as usize, edata as usize};
-    println!(
-        "boot_stack [{:#x}, {:#x})",
-        boot_stack as usize, boot_stack_top as usize
-    );
-    println!(".bss [{:#x}, {:#x})", sbss as usize, ebss as usize);
-    panic!("Shutdown machine!");
+    //println!("[kernel] Hello, world!");
+    mm::init();
+    //println!("[kernel] back to world!");
+    //mm::remap_test();
+    //println!("after initproc!");
+    logger::init();
+    trap::init();
+    trap::enable_timer_interrupt();
+    timer::set_next_trigger();
+    fs::list_apps();
+    task::add_initproc();
+    task::run_tasks();
+    panic!("Unreachable in rust_main!");
 }
 
 

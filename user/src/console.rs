@@ -1,14 +1,14 @@
-use crate::sbi::console_putchar;
 use core::fmt::{self, Write};
+use super::{read, write};
+
+const STDIN: usize = 0;
+const STDOUT: usize = 1;
 
 struct Stdout;
 
-
 impl Write for Stdout {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        for c in s.chars() {
-            console_putchar(c as usize);
-        }
+        write(STDOUT, s.as_bytes());
         Ok(())
     }
 }
@@ -16,11 +16,6 @@ impl Write for Stdout {
 
 pub fn print(args: fmt::Arguments) {
     Stdout.write_fmt(args).unwrap();
-}
-
-
-pub fn print_in_color(args: fmt::Arguments, color_code: u8) {
-    print(format_args!("\x1b[{}m{}\x1b[0m", color_code, args));
 }
 
 
@@ -40,3 +35,8 @@ macro_rules! println {
 }
 
 
+pub fn getchar() -> u8 {
+    let mut c = [0u8; 1];
+    read(STDIN, &mut c);
+    c[0]
+}

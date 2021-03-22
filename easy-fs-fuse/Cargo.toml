@@ -1,0 +1,12 @@
+[package]
+name = "easy-fs-fuse"
+version = "0.1.0"
+authors = ["RainaX <xiaofanx@andrew.cmu.edu>"]
+edition = "2018"
+
+
+[dependencies]
+clap = "2.33.3"
+easy-fs = { path = "../easy-fs" }
+rand = "0.8.0"
+
