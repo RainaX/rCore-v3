@@ -6,6 +6,7 @@ use alloc::collections::BTreeMap;
 use spin::Mutex;
 use lazy_static::*;
 use crate::mm::UserBuffer;
+use easy_fs::Stat;
 
 const MAILBOX_CAPACITY: usize = 16;
 pub const MAX_MAIL_LEN: usize = 256;
@@ -101,6 +102,10 @@ impl File for Mailbox {
 
     fn write(&self, buf: UserBuffer) -> usize {
         self.inner.lock().write_mail(buf)
+    }
+
+    fn fstat(&self) -> Option<Stat> {
+        None
     }
 }
 

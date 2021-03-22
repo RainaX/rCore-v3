@@ -5,6 +5,7 @@ use crate::mm::{
     UserBuffer,
 };
 use crate::task::suspend_current_and_run_next;
+use easy_fs::Stat;
 
 pub struct Pipe {
     readable: bool,
@@ -171,5 +172,9 @@ impl File for Pipe {
                 }
             }
         }
+    }
+
+    fn fstat(&self) -> Option<Stat> {
+        None
     }
 }

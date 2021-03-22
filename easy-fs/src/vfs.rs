@@ -142,6 +142,46 @@ impl Inode {
         )))
     }
 
+    pub fn get_stat(&self, file: Arc<Inode>) -> Stat {
+        let fs = self.fs.lock();
+        let file_inode_id = fs.get_inode_id(file.block_id as u32, file.block_offset);
+        if file_inode_id == 0 {
+            return Stat {
+                dev: 0,
+                ino: 0,
+                mode: StatMode::DIR,
+                nlink: 1,
+                _pad: [0; 7],
+            };
+        }
+
+        let mut nlink: u32 = 0;
+        self.read_disk_inode(|root_inode| {
+            let file_count = (root_inode.size as usize) / DIRENT_SZ;
+            let mut dirent = DirEntry::empty();
+            for i in 9..file_count {
+                assert_eq! (
+                    root_inode.read_at(
+                        i * DIRENT_SZ,
+                        dirent.as_bytes_mut(),
+                        &self.block_device,
+                    ),
+                    DIRENT_SZ,
+                );
+                if dirent.inode_number() == file_inode_id {
+                    nlink += 1;
+                }
+            }
+        });
+        Stat {
+            dev: 0,
+            ino: file_inode_id as u64,
+            mode: StatMode::FILE,
+            nlink,
+            _pad: [0; 7],
+        }
+    }
+
     pub fn link(&self, old_name: &str, new_name: &str) -> Result<(), ()> {
         let mut fs = self.fs.lock();
         let inode_id = match self.read_disk_inode(|disk_inode| {
@@ -198,7 +238,7 @@ impl Inode {
             Err(())
         })
     }
-
+           
     pub fn ls(&self) -> Vec<String> {
         let _ = self.fs.lock();
         self.read_disk_inode(|disk_inode| {
@@ -247,4 +287,21 @@ impl Inode {
         });
     }
 }
-        
+
+#[repr(C)]
+#[derive(Debug)]
+pub struct Stat {
+    pub dev: u64,
+    pub ino: u64,
+    pub mode: StatMode,
+    pub nlink: u32,
+    _pad: [u64; 7],
+}
+
+bitflags! {
+    pub struct StatMode: u32 {
+        const NULL = 0;
+        const DIR = 0o040000;
+        const FILE = 0o100000;
+    }
+}

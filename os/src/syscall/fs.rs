@@ -18,6 +18,7 @@ use crate::fs::{
     unlink_file,
 };
 use alloc::sync::Arc;
+use easy_fs::Stat;
 
 pub fn sys_linkat(_oldfd: usize, olddir: *const u8, _newfd: usize, newdir: *const u8, _flags: u32) -> isize {
     let token = current_user_token();
@@ -45,6 +46,37 @@ pub fn sys_unlinkat(_fd: usize, dir: *const u8, _flags: u32) -> isize {
     match unlink_file(dir.as_str()) {
         Ok(_) => 0,
         Err(_) => -1,
+    }
+}
+
+pub fn sys_fstat(fd: usize, st: usize) -> isize {
+    let token = current_user_token();
+
+    let mut start = st / PAGE_SIZE * PAGE_SIZE;
+    let end = start + core::mem::size_of::<Stat>();
+    while start < end {
+        if !is_mapped(token, start, MapPermission::U | MapPermission::W) {
+            return -1;
+        }
+        start += PAGE_SIZE;
+    }
+    
+    let task = current_task().unwrap();
+    let inner = task.acquire_inner_lock();
+    if fd >= inner.fd_table.len() {
+        return -1;
+    }
+    let file = match inner.fd_table[fd].as_ref() {
+        Some(file) => Arc::clone(file),
+        None => return -1,
+    };
+    drop(inner);
+    match file.fstat() {
+        Some(stat) => {
+            *translated_refmut(token, st as *mut Stat) = stat;
+            0
+        },
+        None => -1,
     }
 }
 

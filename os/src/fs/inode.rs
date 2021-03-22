@@ -1,6 +1,7 @@
 use easy_fs::{
     EasyFileSystem,
     Inode,
+    Stat,
 };
 use crate::drivers::BLOCK_DEVICE;
 use alloc::sync::Arc;
@@ -162,5 +163,12 @@ impl File for OSInode {
             total_write_size += write_size;
         }
         total_write_size
+    }
+
+    fn fstat(&self) -> Option<Stat> {
+        let inner = self.inner.lock();
+        let inode = inner.inode.clone();
+        drop(inner);
+        Some(ROOT_INODE.get_stat(inode))
     }
 }
